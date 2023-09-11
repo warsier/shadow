@@ -1,5 +1,7 @@
 #include "DCFG.h"
 #include "InsBlock.h"
+#include "InsRoot.h"
+#include "InsMem.h"
 
 using namespace std;
 
@@ -115,7 +117,6 @@ void DCFG::write(const std::string &file) {
 // 			// if there are no instructions in this block
 // 			// and this block is sequential
 // 			if (blk->ins.size() == 0 && blk->inEdges.size() == 1 && blk->outEdges.size() == 1) {
-				
 // 				InsBlock *prev = *blk->inEdges.begin();
 // 				InsBlock *next = *blk->outEdges.begin();
 // 				// std::cout << prev->getId() << " " << blk->getId() << " " << next->getId() << std::endl;

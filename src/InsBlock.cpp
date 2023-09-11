@@ -48,7 +48,8 @@ void InsBlock::calcOutEdgesOrder(std::vector<InsBlock*> &order) const {
   //   cout << sum(outEdgesStack) << " " << sum(outEdgesTrace) << endl;
 
   for (auto it : outEdgesTrace) {
-    if (!visited[it.first]) {
+    // outEdgesTrace may contain non-existent edges
+    if (visited.find(it.first) != visited.end() && !visited[it.first]) {
       visited[it.first] = true;
       order.push_back(it.first);
       // cout << "visited" << endl;
@@ -192,7 +193,7 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
   out << "block" << id << ":\n";
 #ifdef DEBUG
   // out << _tab(indent) << "printf(\"" << id << " \");\n";
-  out << _tab(indent) << "exec_cnt[" << id << "]++;\n";
+  out << _tab(indent) << "INC_EXEC_CNT(" << id << ");\n";
   int pathcnt = 0;
 #endif
   for (InsBase *base : ins) {
@@ -202,12 +203,12 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
   if (outEdges.size() == 0) {
     return out.str();
   }
-
+  
   // simple if just one edge
   if (outEdgesStack.size() == 1) {
 #ifdef DEBUG
-    out << _tab(indent) << "{ path_taken[" << id << "][" 
-        << pathcnt << "]++; goto block" << outEdgesStack[0].first->id
+    out << _tab(indent) << "{ INC_PATH_TAKEN(" << id << ", "
+        << pathcnt << "); goto block" << outEdgesStack[0].first->id
         << "; }\n\n";
     pathcnt++;
 #else
@@ -221,8 +222,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
     return out.str();
   }
 
-  // small number number of transitions. No need to find patterns
-  if (outEdgesStack.size() < 13) {
+  // small number of transitions. No need to find patterns
+  if (outEdgesStack.size() < 200000) {
     out << _tab(indent) << "//Few edges. Don't bother optimizing\n";
 
     out << _tab(indent) << "static uint64_t out_" << id << " = 0;\n";
@@ -251,8 +252,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
         out << "if (out_" << id << " <= " << total << "LL) ";
       }
 #ifdef DEBUG
-    out << "{ path_taken[" << id << "][" 
-        << pathcnt << "]++; goto block" << edge->id
+    out << "{ INC_PATH_TAKEN(" << id << ", " 
+        << pathcnt << "); goto block" << edge->id
         << "; }\n";
       pathcnt++;
 #else
@@ -312,8 +313,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
         out << "if (out_" << id << " <= " << tot_cnt << "LL) ";
       }
 #ifdef DEBUG
-      out << "{ path_taken[" << id << "][" 
-          << pathcnt << "]++; goto block" << nb->id
+      out << "{ INC_PATH_TAKEN(" << id << ", " 
+          << pathcnt << "); goto block" << nb->id
           << "; }\n";
       pathcnt++;
 #else
@@ -357,8 +358,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
           out << "if (out_" << id << " <= " << tot_cnt << "LL) ";
         }
 #ifdef DEBUG
-        out << "{ path_taken[" << id << "][" 
-          << pathcnt << "]++; goto block" << nb->id
+        out << "{ INC_PATH_TAKEN(" << id << ", " 
+          << pathcnt << "); goto block" << nb->id
           << "; }\n";
       pathcnt++;
 #else
@@ -490,8 +491,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
     out << "{\n";
     out << _tab(indent + 2) << "out_" << id << "_" << tmpBlks[i]->id << "--;\n";
 #ifdef DEBUG
-    out << _tab(indent + 2) << "{ path_taken[" << id << "][" 
-          << pathcnt << "]++; goto block" << tmpBlks[i]->id
+    out << _tab(indent + 2) << "{ INC_PATH_TAKEN(" << id << ", " 
+          << pathcnt << "); goto block" << tmpBlks[i]->id
           << "; }\n";
       pathcnt++;
 #else
@@ -506,8 +507,8 @@ std::string InsBlock::printCodeBody(UINT32 indent) const {
 
   //add default jump (last edge)
 #ifdef DEBUG
-  out << _tab(indent + 2) << "{ path_taken[" << id << "][" 
-          << pathcnt << "]++; goto block" << lastEntry.first->id
+  out << _tab(indent + 2) << "{ INC_PATH_TAKEN(" << id << ", " 
+          << pathcnt << "); goto block" << lastEntry.first->id
           << "; }\n";
       pathcnt++;
 #else
@@ -549,6 +550,13 @@ void InsBlock::replaceOutEdge(InsBlock *old, InsBlock *nw) {
     return;   //do nothing
   }
 
+  if (id == 33) {
+    cout << "before: ";
+    for (auto it : outEdgesStack)
+      cout << it.first->id << " ";
+    cout << endl;
+  }
+
   for (size_t i = 0; i < outEdgesStack.size(); i++) {
     if (outEdgesStack[i].first == old) {
       outEdgesStack[i].first = nw;
@@ -556,12 +564,19 @@ void InsBlock::replaceOutEdge(InsBlock *old, InsBlock *nw) {
   }
   updateOutEdgesStack();    //update run count
 
+  if (id == 33) {
+    cout << "after: ";
+    for (auto it : outEdgesStack)
+      cout << it.first->id << " ";
+    cout << endl;
+  }
+
   outEdges.erase(old);
   outEdges.insert(nw);
 
   //fix in edges
-  //old->inEdges.erase(this);
-  //nw->inEdges.insert(this);
+  // old->inEdges.erase(this);
+  // nw->inEdges.insert(this);
 }
 
 void InsBlock::removeOutEdge(InsBlock *oblk) {
