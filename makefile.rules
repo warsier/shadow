@@ -19,50 +19,33 @@
 # Tests defined here should not be defined in TOOL_ROOTS and TEST_ROOTS.
 TEST_TOOL_ROOTS := MAPProfiler
 
-# This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
-TEST_ROOTS :=
+##############################################################
+#
+# Build rules
+#
+##############################################################
 
-# This defines the tools which will be run during the the tests, and were not already defined in
-# TEST_TOOL_ROOTS.
+# See makefile.default.rules for the default build rules.
+TOOL_CXXFLAGS += -DSDE_INIT -DPINPLAY -I$(PINPLAY_ROOT)/include
+TOOL_CXXFLAGS := -I$(ALIF_IDIR) -I$(SDE_ROOT)/include $(TOOL_CXXFLAGS)
 
-PINPLAY_HOME=$(PIN_ROOT)/extras/pinplay/
-PINPLAY_INCLUDE_HOME=$(PINPLAY_HOME)/include
-PINPLAY_LIB_HOME=$(PINPLAY_HOME)/lib/$(TARGET)
-EXT_LIB_HOME=$(PINPLAY_HOME)/lib-ext/$(TARGET)
-DCFG_HOME=$(PIN_ROOT)/extras/dcfg/
-DCFG_INCLUDE_HOME=$(DCFG_HOME)/include
-DCFG_LIB_HOME=$(DCFG_HOME)/lib/$(TARGET)
-
-TOOL_ROOTS :=
-#TOOL_CXXFLAGS += lib/libfort/fort.c
-TOOL_CXXFLAGS += -I$(ALIF_IDIR) -I$(PINPLAY_INCLUDE_HOME) -I$(DCFG_INCLUDE_HOME)
-
-TOOL_LIBS := $(DCFG_LIB_HOME)/libdcfg-pinplay.a $(DCFG_LIB_HOME)/libintelzipstream.a $(PINPLAY_LIB_HOME)/libpinplay.a $(EXT_LIB_HOME)/libbz2.a $(EXT_LIB_HOME)/libzlib.a $(TOOL_LIBS)
-
-# This defines the static analysis tools which will be run during the the tests. They should not
-# be defined in TEST_TOOL_ROOTS. If a test with the same name exists, it should be defined in
-# TEST_ROOTS.
-# Note: Static analysis tools are in fact executables linked with the Pin Static Analysis Library.
-# This library provides a subset of the Pin APIs which allows the tool to perform static analysis
-# of an application or dll. Pin itself is not used when this tool runs.
-SA_TOOL_ROOTS :=
-
-# This defines all the applications that will be run during the tests.
-APP_ROOTS :=
+ifeq ($(OS),Windows_NT)
+TOOL_LPATHS += /LIBPATH:$(SDE_ROOT)/lib/$(TARGET) /LIBPATH:$(PINPLAY_ROOT)/$(TARGET)
+TOOL_LPATHS += libpinplay.lib libsde.lib bz2.lib zlib.lib
+else
+# sde and pinplay libraries appears twice to avoid circular dependency
+TOOL_LPATHS += -L$(SDE_ROOT)/lib/$(TARGET) -L$(PINPLAY_ROOT)/$(TARGET)
+TOOL_LPATHS += -lpinplay -lsde -lpinplay -lsde -lbz2 -lzlib
+endif
 
 # This defines any additional object files that need to be compiled.
 ALIF_SRC := $(wildcard src/*.cpp)
 ALIF_SRC_ROOTS := $(ALIF_SRC:%.cpp=% )
-ALIF_OBJS_TMP := $(subst src/,$(OBJDIR)src/,$(ALIF_SRC)) 
+# ALIF_OBJS_TMP := $(subst src/,$(OBJDIR)src/,$(ALIF_SRC)) 
+ALIF_OBJS_TMP := $(subst src/,$(OBJDIR),$(ALIF_SRC)) 
 ALIF_OBJS := $(subst .cpp,.o,$(ALIF_OBJS_TMP))
 OBJECT_ROOTS := $(ALIF_SRC_ROOTS)
 
-
-# This defines any additional dlls (shared objects), other than the pintools, that need to be compiled.
-DLL_ROOTS :=
-
-# This defines any static libraries (archives), that need to be built.
-LIB_ROOTS := 
 
 ###### Define the sanity subset ######
 
@@ -71,24 +54,8 @@ LIB_ROOTS :=
 SANITY_SUBSET := $(TEST_TOOL_ROOTS) $(TEST_ROOTS)
 
 
-##############################################################
-#
-# Test recipes
-#
-##############################################################
-
-# This section contains recipes for tests other than the default.
-# See makefile.default.rules for the default test rules.
-# All tests in this section should adhere to the naming convention: <testname>.test
-
-
-##############################################################
-#
-# Build rules
-#
-##############################################################
-
-# This section contains the build rules for all binaries that have special build rules.
-# See makefile.default.rules for the default build rules.
-
 TOOL_CXXFLAGS += -DDEBUG
+
+# %{OBJ_SUFFIX}: src/%.cpp
+# 	mkdir -p ${COMP_OBJ}
+# $(CXX) ${MYDEFINES} ${COPT} $(TOOL_CXXFLAGS) $(CXXFLAGS) $(TOOL_INCLUDES) $(PIN_CXXFLAGS) ${COMP_OBJ}$@ $<

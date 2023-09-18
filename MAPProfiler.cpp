@@ -25,6 +25,7 @@
 #include <set>
 
 #include "pin.H"
+#include "sde-init.H"
 
 using namespace std;
 
@@ -42,11 +43,6 @@ KNOB<string> knobOutFile(KNOB_MODE_WRITEONCE, "pintool", "out", "genCode.cpp",
 KNOB<string> knobStatFile(KNOB_MODE_WRITEONCE, "pintool", "stat", "cloneStat.log",
 		"Clone statistics file name.");
 
-// Enable Log
-KNOB<bool> knobLogEn(KNOB_MODE_WRITEONCE, "pintool", "log", "0",
-		"Enable logging \
-        [1: enable, 0: disable (default)].");
-
 // Keep percentage
 KNOB<float> knobTopPerc(KNOB_MODE_WRITEONCE, "pintool", "top", "95",
 		"Top instruction percentage.");
@@ -58,11 +54,11 @@ KNOB<INT64> knobStart(KNOB_MODE_WRITEONCE, "pintool", "start", "0",
 KNOB<UINT64> knobMaxInst(KNOB_MODE_WRITEONCE, "pintool", "maxinst", "-1",
 		"Profile upto maxinst number of instructions (any type, not just memory instructions)");
 
-// DCFG and PinPlay intergration
-PINPLAY_ENGINE pinplay_engine;
-KNOB<BOOL> KnobPinPlayReplayer(KNOB_MODE_WRITEONCE, 
-                      "pintool", "replay", "0",
-                      "Activate the pinplay replayer");
+// // DCFG and PinPlay intergration
+// PINPLAY_ENGINE pinplay_engine;
+// KNOB<BOOL> KnobPinPlayReplayer(KNOB_MODE_WRITEONCE, 
+//                       "pintool", "replay", "0",
+//                       "Activate the pinplay replayer");
 
 // Max threads
 //KNOB<UINT64> knobMaxThreads(KNOB_MODE_WRITEONCE, "pintool", "threads", "10000",	"Upper limit of the number of threads that can be used by the program being profiled.");
@@ -83,7 +79,6 @@ void printDotFile(const char *fname);
  ******************************************************************************/
 static string rtn_name;
 //static PIN_LOCK lock;
-static bool log_en = false;
 static float top_perc;
 static string out_file_name;
 static string stat_file_name;
@@ -234,7 +229,7 @@ void deriveLoopInfo(InsMem *ins) {
 		if (cln_utils::isRepeat(ins->addr, sz, sz / linfo.cumProd, m)) {
 			sz = linfo.cumProd;
 			_info.push_back( { linfo.lp, m });
-		} else {
+		} else { 
 			_info.push_back( { nullptr, 0 });
 			break;
 		}
@@ -755,19 +750,29 @@ void generateCodeHeader(ofstream &out) {
 	out << "#endif\n\n";
 
 #ifdef DEBUG
-	out << "uint32_t exec_cnt[50000] = {0};\n";
-	out << "uint32_t path_taken[50000][30] = {0};\n";
+	out << "#ifdef DEBUG\n";
+	out << _tab(1) << "#define INC_EXEC_CNT(x) exec_cnt[x]++\n";
+	out << _tab(1) << "#define INC_PATH_TAKEN(x, y) path_taken[x][y]++\n";
+	out << "#elif defined GEM5\n";
+	out << _tab(1) << "#define INC_EXEC_CNT(x) \n";
+	out << _tab(1) << "#define INC_PATH_TAKEN(x, y) \n";
+	out << "#else\n";
+	out << _tab(1) << "#define INC_EXEC_CNT(x) \n";
+	out << _tab(1) << "#define INC_PATH_TAKEN(x, y) \n";
+	out << "#endif\n";
+	out << "uint32_t exec_cnt[5000] = {0};\n";
+	out << "uint32_t path_taken[5000][15] = {0};\n";
 
 	out << "void int_handler(int s) {\n";
 	out << _tab(1) << "FILE *fptr = fopen(\"output2.csv\", \"w\");\n";
 	out << _tab(1) << "fprintf(fptr, \"blockid,clone_exec_count\\n\");\n";
-	out << _tab(1) << "for (int i = 0; i < 50000; i++)\n";
+	out << _tab(1) << "for (int i = 0; i < 5000; i++)\n";
 	out << _tab(2) << "fprintf(fptr, \"%d,%d\\n\", i, exec_cnt[i]);\n";
 	out << _tab(1) << "fclose(fptr);\n";
 
 	out << _tab(1) << "fptr = fopen(\"output3.csv\", \"w\");\n";
 	out << _tab(1) << "fprintf(fptr, \"blockid,\\n\");\n";
-	out << _tab(1) << "for (int i = 0; i < 50000; i++) {\n";
+	out << _tab(1) << "for (int i = 0; i < 5000; i++) {\n";
 	out << _tab(2) << "fprintf(fptr, \"%d,\", i);\n";
 	out << _tab(2) << "for (int j = 0; j < 30; j++)\n";
 	out << _tab(3) << "fprintf(fptr, \"%d,\", path_taken[i][j]);\n";
@@ -833,7 +838,9 @@ string generateCodeHeaderFragment(int indent, const vector<InsMem*> &insList){
 void generateCodeFooter(ofstream &out) {
 	//out << "block1:\n";
 #ifdef DEBUG
+	out << "#ifdef DEBUG\n";
 	out << _tab(1) << "int_handler(0);\n";
+	out << "#endif\n";
 #endif
 	out << _tab(1) << "free((void*)gm);\n";
 	out << _tab(1) << "return 0;\n";
@@ -874,7 +881,10 @@ void generateCodeFragment(int indent, const vector<InsMem*> &insList, const set<
 	ofstream ofs("output.csv");
 	DCFG_ID_VECTOR vec;
 	dcfg->dcfgProcInfo->get_basic_block_ids(vec);
-	ofs << "blockid,dcfgid,exec_count,static_instr_count,dyn_instr_count,first_inst_addr,last_inst_addr,filename,line#,symbol_name" << endl;
+	ofs << "blockid,dcfgid,exec_count,static_instr_count,dyn_instr_count,"
+	<< "total_read_bytes,total_write_bytes,"
+	<< "first_inst_addr,last_inst_addr,filename,line#,symbol_name"
+	<< endl;
 	for (InsBlock *blk : cfg) {
 		if ((blk != beginBlock) && (blk != endBlock) && (blk->isUsed)){
 			if (blk->dcfgid != -1) {
@@ -883,11 +893,27 @@ void generateCodeFragment(int indent, const vector<InsMem*> &insList, const set<
 				auto symbolname = bbl->get_symbol_name();
 				auto imageid = bbl->get_image_id();
 				UINT64 base_addr = dcfg->dcfgProcInfo->get_image_info(imageid)->get_base_address();
+
+				UINT64 byteread = 0, bytewrite = 0;
+				for (InsBase *ins : blk->ins) {
+					if (ins != nullptr && ins->type == InsTypeNormal) {
+						InsMem *im = (InsMem *) ins;
+						if (im->accType == AccessTypeRead)
+							byteread += im->totalSz;
+						if (im->accType == AccessTypeWrite)
+							bytewrite += im->totalSz;
+						if (im->accType == AccessTypeRMW) {
+							byteread += im->totalSz;
+							bytewrite += im->totalSz;
+						}
+					}
+				}
 				ofs << blk->getId() << ","
 					<< blk->dcfgid << "," 
 					<< bbl->get_exec_count() << "," 
 					<< bbl->get_num_instrs() << ","
 					<< bbl->get_instr_count() << ","
+					<< byteread << "," << bytewrite << ","
 					<< hex << (bbl->get_first_instr_addr() - base_addr) << "," 
 					<< (bbl->get_last_instr_addr() - base_addr) << dec << "," 
 					<< (filename != nullptr ? *filename : "N/A")<< ","
@@ -1248,7 +1274,7 @@ void updateAddrInfo(vector<InsMem*> &insList) {
 	for (InsMem *it : insList) {
 		it->addrStrideMap.clear();
 		it->strideDist.clear();
-		assert(it->maxAddr > it->minAddr);
+		// assert(it->maxAddr > it->minAddr); // Yizhou: for debug purpose
 		it->maxAddr += it->accSz;
 
 		UINT64 cnt = it->addr.size();
@@ -1621,12 +1647,14 @@ void processInterval() {
 	filteredInsList = deleteZeroAccesses(filteredInsList);
 
 	// 1. filter constant access instructions
-	filteredInsList = deleteConstAccess2(filteredInsList);
+	// Yizhou: remove this for debug purpose
+	// filteredInsList = deleteConstAccess2(filteredInsList);
 
 	//print_filtering(filteredInsList, "After const access filtering...", false);
 	update_filtering_info(filteredInsList, false, fInfoAfterZero);
 
 	// 2. Only take instructions that represents top_perc of reads/writes
+	// Yizhou: remove this for debug purpose
 	filteredInsList = keepTop(filteredInsList, top_perc);
 
 	//cout << "Static memory instructions: top " << filteredInsList.size() << endl;
@@ -1646,9 +1674,10 @@ void processInterval() {
 	
 	updateParentLoops(cfg);
 	derivePattern(filteredInsList);
-#ifndef DEBUG
-	compressCFG(cfg);
-#endif
+
+
+	// compressCFG(cfg);
+
 #ifdef DEBUG
 	printDotFile("dcfgBC.gv");
 #endif
@@ -2070,17 +2099,12 @@ VOID Trace(TRACE trace, VOID *v) {
  * PIN Entry
  ******************************************************************************/
 int main(int argc, char *argv[]) {
-	if (PIN_Init(argc, argv)) {
-		cerr << "Wrong arguments. Exiting..." << endl;
-		return -1;
-	}
-
 	// Initializations
-	// PIN_InitLock(&lock);
 	PIN_InitSymbolsAlt(IFUNC_SYMBOLS);
+	sde_pin_init(argc, argv);
+    sde_init();
 
 	rtn_name = knobFunctionName.Value();
-	log_en = knobLogEn.Value();
 	top_perc = knobTopPerc.Value();
 	out_file_name = knobOutFile.Value();
 	stat_file_name = knobStatFile.Value();

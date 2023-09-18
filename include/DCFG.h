@@ -50,5 +50,6 @@ public:
   void compressDCFG(std::set<InsBlock *> &cfg);
 
   static void recordBBL(DCFG *self, InsBlock *blk);
+  // static void recordMemoryInstruction(DCFG *self, InsRoot *root, ADDRINT ea, UINT32 op);
 
 };
