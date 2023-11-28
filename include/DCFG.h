@@ -20,7 +20,7 @@ class DCFG {
 
 public:
 
-  std::string dcfg_cfg_file;
+  std::string dcfg_cfg_file, dcfg_trace_file;
   ofstream shadow_output, dcfg_output;
   UINT64 shadow_cnt = 0, dcfg_cnt = 0;
   bool dcfg_trace_done;
@@ -38,7 +38,7 @@ public:
   InsBlock *prevBlockinTrace = nullptr;
 
   // if cfg file not supplied then we are just generating cfg file as the first pass
-  DCFG(InsBlock *&beginBlock, InsBlock *&endBlock, const std::string &dcfg_cfg_file="");
+  DCFG(InsBlock *&beginBlock, InsBlock *&endBlock, const std::string &dcfg_cfg_file="", const std::string&dcfg_trace_file="");
 
   bool exist() {
     return dcfgProcInfo != nullptr;
@@ -51,5 +51,14 @@ public:
 
   static void recordBBL(DCFG *self, InsBlock *blk);
   // static void recordMemoryInstruction(DCFG *self, InsRoot *root, ADDRINT ea, UINT32 op);
+
+  // DCFG trace data structure for summarizeTrace
+  std::vector<size_t> edge_list;
+	std::vector<size_t> block_size_list;
+	std::vector<size_t> loop_list;
+	std::vector<size_t> block_id_list;
+	std::vector<size_t> edge_id_list;
+
+  int summarizeTrace(DCFG_DATA_CPTR dcfg, string logfile, std::vector<std::vector<int>> &result);
 
 };

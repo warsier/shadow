@@ -4,6 +4,8 @@
 #include "InsBase.h"
 #include "InsHashedRoot.h"
 #include "InsRoot.h"
+#include "InsRand.h"
+#include "InsMix.h"
 #include "InsMem.h"
 #include "InsCondJump.h"
 #include "InsLoop.h"
@@ -17,8 +19,6 @@
 #include "PatternSmallTile.h"
 #include "PatternConst.h"
 #include "PatternDominant.h"
-#include "InsRand.h"
-#include "InsMix.h"
 #include "DCFG.h"
 #include <unordered_map>
 #include <algorithm>
@@ -1737,7 +1737,7 @@ VOID Fini(INT32 code, VOID *v) {
 }
 
 VOID DCFGFini(INT32 code, VOID *v) {
-	dcfg->write("output.txt");
+	// dcfg->write("output.txt");
 
 	delete dcfg;
 }
@@ -2127,7 +2127,7 @@ int main(int argc, char *argv[]) {
 		insTrace.reserve(interval);
 	}
 
-	dcfg = new DCFG(beginBlock, endBlock, "output.txt");
+	dcfg = new DCFG(beginBlock, endBlock, "dcfg-out.dcfg.json.bz2", "dcfg-out.trace.json.bz2");
 
 	IMG_AddInstrumentFunction(ImgCallback, NULL);
 	if (dcfg->exist()) {

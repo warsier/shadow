@@ -10,7 +10,7 @@ void test()
 {
 	int *arr = (int *) aligned_alloc(LINE_SIZE, PAGE_SIZE * PAGE_MAX);
 	int INTNUM_TOTAL = PAGE_SIZE * PAGE_MAX / sizeof(int);
-	for (int i = 0; i < 1000000; ++i) {
+	for (int i = 0; i < 1000; ++i) {
 		if (i % 2 == 0) {
 			arr[i] = i; 
 		}
